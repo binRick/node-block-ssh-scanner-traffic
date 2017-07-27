@@ -12,7 +12,10 @@ var validateip = require('validate-ip'),
     pcapFilter = '',
     pmacctdProcess = null,
     dropCommand = '/sbin/iptables -I FORWARD -s _SRC_ -j DROP',
+    Dropped = [],
     Attackers = {};
+
+
 
 var nonLocalAddress = function(ip) {
     var nonLocal = true;
@@ -21,6 +24,19 @@ var nonLocalAddress = function(ip) {
     });
     return nonLocal;
 };
+
+setInterval(function(){
+	Dropped = child.execSync('iptables -L FORWARD -n').toString().split('\n').filter(function(l){
+return l.match(/^DROP*./g);
+	}).map(function(l){
+return condenseWhitespace(l);
+	}).filter(function(l){
+return l.split(' ').length==5 && validateip(l.split(' ')[3]) && l.split(' ')[1]=='all' && l.split(' ')[4]=='0.0.0.0/0';
+	}).map(function(l){
+return l.split(' ')[3];
+	});
+}, 2000);
+
 
 setInterval(function() {
     _.each(_.keys(Attackers), function(attacker) {
@@ -44,7 +60,8 @@ setInterval(function() {
             console.log(c.red('\t\tDropping src host ' + attacker + '!'));
             var dCmd = dropCommand.replace('_SRC_', attacker);
             console.log('\t\t\t' + dCmd);
-	    child.execSync(dCmd);
+	                delete Attackers[attacker];
+            child.execSync(dCmd);
         }
 
     });
@@ -59,7 +76,7 @@ var processTopTalkers = function(topTalkers) {
             dst: i.split(' ')[1],
         };
     }).filter(function(i) {
-        return nonLocalAddress(i.src);
+        return nonLocalAddress(i.src) && !_.contains(Dropped, i.src);
     });
     var updated = 0;
     _.each(topTalkers, function(tt) {
@@ -76,7 +93,7 @@ var processTopTalkers = function(topTalkers) {
         });
         Attackers[tt.src].Updated = Math.round(new Date().getTime() / 1000);
     });
-    console.log(topTalkers.length + ' updates / ' + _.keys(Attackers).length, 'Attackers');
+//    console.log(topTalkers.length + ' updates / ' + _.keys(Attackers).length, 'Attackers');
 };
 
 process.on('exit', function() {

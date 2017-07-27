@@ -41,7 +41,7 @@ return l.split(' ')[3];
 setInterval(function() {
     _.each(_.keys(Attackers), function(attacker) {
         Attackers[attacker].Destinations = Attackers[attacker].Destinations.filter(function(d) {
-            return d.Created > (Math.round(new Date().getTime() / 1000) - 60);
+            return d.Created > (Math.round(new Date().getTime() / 1000) - 120);
         });
         if (Attackers[attacker].Destinations.length == 0) {
             console.log('\t\t\t\t\tRemoving attacker ' + c.white(attacker));
